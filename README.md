@@ -4,7 +4,15 @@ A collection of custom themes for SDDM (Simple Desktop Display Manager), featuri
 
 ## Available Themes
 
-### 1. Nothing OS Theme
+### 1, Noctalia SDDM Theme
+
+Noctalia SDDM is a cozy, elegant login theme for **SDDM** , designed to complement the **Noctalia Shell** experience. It mimics the warm, dark aesthetic of the Rose Pine color palette, featuring rounded corners, smooth scaling, and a clean, modern interface tailored for Hyprland and KDE users.
+
+![Noctalia Theme Screenshot](https://raw.githubusercontent.com/mahaveergurjar/sddm/noctalia/Assets/preview.png)
+
+[**➡️ View "Noctalia" Theme Branch**](https://github.com/mahaveergurjar/sddm/tree/noctalia)
+
+### 2. Nothing OS Theme
 
 A minimalist, monochrome login theme inspired by the unique aesthetic of Nothing OS. It features dot-matrix typography and a clean, futuristic look.
 
@@ -14,7 +22,7 @@ A minimalist, monochrome login theme inspired by the unique aesthetic of Nothing
 
 ---
 
-### 2. Pixel UI Theme
+### 3. Pixel UI Theme
 
 A modern and vibrant theme based on the Android 16 Pixel UI design language. It brings the familiar, polished look of Pixel devices to your login screen.
 
