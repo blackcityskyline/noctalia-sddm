@@ -49,6 +49,8 @@ Rectangle {
     LayoutMirroring.enabled: Qt.locale().textDirection == Qt.RightToLeft
     LayoutMirroring.childrenInherit: true
 
+    readonly property real blurRadius: config.blurRadius || 0
+
     // -------------------------------------------------------------------------
     // Background
     // -------------------------------------------------------------------------
@@ -60,13 +62,16 @@ Rectangle {
         asynchronous: true
         cache: true
         clip: true
+        visible: root.blurRadius <= 0 // Hide if blurred version is shown
     }
 
-    // Dim Overlay from bottom
-    ShaderEffectSource {
+    FastBlur {
         anchors.fill: parent
-        sourceItem: wallpaper
-        recursive: false
+        source: wallpaper
+        radius: root.blurRadius
+        transparentBorder: false
+        visible: root.blurRadius > 0
+        cached: true
     }
 
     Rectangle {
@@ -449,9 +454,9 @@ Rectangle {
                 // Power Buttons
                 Repeater {
                     model: [
-                        { text: "Suspend", action: function() { sddm.suspend() } },
-                        { text: "Reboot", action: function() { sddm.reboot() } },
-                        { text: "Shutdown", action: function() { sddm.powerOff() } }
+                        { text: "Suspend", type: "suspend" },
+                        { text: "Reboot", type: "reboot" },
+                        { text: "Shutdown", type: "shutdown" }
                     ]
                     
                     delegate: Controls.Button {
@@ -472,7 +477,15 @@ Rectangle {
                             verticalAlignment: Text.AlignVCenter
                         }
                         
-                        onClicked: modelData.action()
+                        onClicked: {
+                            if (modelData.type === "suspend") {
+                                sddm.suspend()
+                            } else if (modelData.type === "reboot") {
+                                sddm.reboot()
+                            } else if (modelData.type === "shutdown") {
+                                sddm.powerOff()
+                            }
+                        }
                     }
                 }
             }
