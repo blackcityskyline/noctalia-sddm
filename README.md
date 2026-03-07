@@ -71,7 +71,7 @@ You can test the theme without logging out by running the sddm-greeter in test m
 sddm-greeter --test-mode --theme /usr/share/sddm/themes/sddm
 ```
 
-_Note: Ensure you have `qt5-graphicaleffects` and `qt5-quickcontrols2` (or their Qt6 equivalents) installed._
+_Note: Ensure you have `qt6-5compat` and `qt6-declarative` installed for Qt6 compatibility._
 
 ## Credits
 
