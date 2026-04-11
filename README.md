@@ -36,7 +36,7 @@ A modern and vibrant theme based on the Android 16 Pixel UI design language. It 
 
 A stunning, samurai-inspired login theme featuring interactive power control UI, multi-user session dropdowns, and complex frosted-glass card layering mapped seamlessly against a deep crimson aesthetic.
 
-![Ronin Theme Screenshot](https://raw.githubusercontent.com/mahaveergurjar/sddm/ronin/preview.png)
+![Ronin Theme Screenshot](https://raw.githubusercontent.com/mahaveergurjar/sddm/ronin/Ronin/preview.png)
 
 [**➡️ View "Ronin" Theme Branch**](https://github.com/mahaveergurjar/sddm/tree/ronin)
 
