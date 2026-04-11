@@ -30,6 +30,16 @@ A modern and vibrant theme based on the Android 16 Pixel UI design language. It 
 
 [**➡️ View "Pixel" Theme Branch**](https://github.com/mahaveergurjar/sddm/tree/pixel)
 
+---
+
+### 4. Ronin Theme
+
+A stunning, samurai-inspired login theme featuring interactive power control UI, multi-user session dropdowns, and complex frosted-glass card layering mapped seamlessly against a deep crimson aesthetic.
+
+![Ronin Theme Screenshot](https://raw.githubusercontent.com/mahaveergurjar/sddm/ronin/preview.png)
+
+[**➡️ View "Ronin" Theme Branch**](https://github.com/mahaveergurjar/sddm/tree/ronin)
+
 ## Installation
 
 To install a specific theme:
