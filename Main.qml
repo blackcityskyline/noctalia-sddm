@@ -341,10 +341,10 @@ Rectangle {
                         
                         focus: true
                         
-                        onAccepted: sddm.login(userModel.lastUser, passwordBox.text, sessionModel.lastIndex)
+                        onAccepted: sddm.login(userModel.lastUser, passwordBox.text, sessionList.currentIndex)
                         Keys.onPressed: {
                             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                sddm.login(userModel.lastUser, passwordBox.text, sessionModel.lastIndex)
+                                sddm.login(userModel.lastUser, passwordBox.text, sessionList.currentIndex)
                                 event.accepted = true
                             }
                         }
@@ -380,7 +380,7 @@ Rectangle {
                         verticalAlignment: Text.AlignVCenter
                     }
                     
-                    onClicked: sddm.login(userModel.lastUser, passwordBox.text, sessionModel.lastIndex)
+                    onClicked: sddm.login(userModel.lastUser, passwordBox.text, sessionList.currentIndex)
                 }
             }
             
