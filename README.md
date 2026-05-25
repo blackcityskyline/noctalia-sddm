@@ -1,50 +1,83 @@
-# My SDDM Themes
+# Noctalia SDDM Theme
 
-A collection of custom themes for SDDM (Simple Desktop Display Manager), featuring designs inspired by Nothing OS and Google Pixel UI.
+Noctalia SDDM is a cozy, elegant login theme for **SDDM (Simple Desktop Display Manager)**, designed to complement the **Noctalia Shell** experience. It mimics the warm, dark aesthetic of the Rose Pine color palette, featuring rounded corners, smooth scaling, and a clean, modern interface tailored for Hyprland and KDE users.
 
-## Available Themes
+![Noctalia SDDM Preview](Assets/preview.png)
 
-### 1, Noctalia SDDM Theme
+## Features
 
-Noctalia SDDM is a cozy, elegant login theme for **SDDM** , designed to complement the **Noctalia Shell** experience. It mimics the warm, dark aesthetic of the Rose Pine color palette, featuring rounded corners, smooth scaling, and a clean, modern interface tailored for Hyprland and KDE users.
-
-![Noctalia Theme Screenshot](https://raw.githubusercontent.com/mahaveergurjar/sddm/noctalia/Assets/preview.png)
-
-[**➡️ View "Noctalia" Theme Branch**](https://github.com/mahaveergurjar/sddm/tree/noctalia)
-
-### 2. Nothing OS Theme
-
-A minimalist, monochrome login theme inspired by the unique aesthetic of Nothing OS. It features dot-matrix typography and a clean, futuristic look.
-
-![Nothing Theme Screenshot](https://raw.githubusercontent.com/mahaveergurjar/sddm/nothing/image.png)
-
-[**➡️ View "Nothing" Theme Branch**](https://github.com/mahaveergurjar/sddm/tree/nothing)
-
----
-
-### 3. Pixel UI Theme
-
-A modern and vibrant theme based on the Android 16 Pixel UI design language. It brings the familiar, polished look of Pixel devices to your login screen.
-
-![Pixel Theme Screenshot](https://raw.githubusercontent.com/mahaveergurjar/sddm/pixel/image.png)
-
-[**➡️ View "Pixel" Theme Branch**](https://github.com/mahaveergurjar/sddm/tree/pixel)
-
----
-
-### 4. Ronin Theme
-
-A stunning, samurai-inspired login theme featuring interactive power control UI, multi-user session dropdowns, and complex frosted-glass card layering mapped seamlessly against a deep crimson aesthetic.
-
-![Ronin Theme Screenshot](https://raw.githubusercontent.com/mahaveergurjar/sddm/ronin/image.png)
-
-[**➡️ View "Ronin" Theme Branch**](https://github.com/mahaveergurjar/sddm/tree/ronin)
+- **Rose Pine Aesthetic** – A soothing, high-contrast dark theme using the Rose Pine palette.
+- **Responsive Scaling** – Automatically adapts to 1080p, 1440p, and 4K resolutions.
+- **Smart Avatar Handling** – Automatically detects user profile pictures or gracefully falls back to defaults.
+- **Session Management** – Built-in support for switching desktop sessions (Wayland/X11).
+- **Integrated Power Controls** – Suspend, Reboot, and Shutdown accessible directly from the login screen.
+- **Customizable Configuration** – easy tweaks via `theme.conf`.
 
 ## Installation
 
-To install a specific theme:
+### 1. Clone the repository
 
-1. Click the **View Branch** link for the theme you want.
-2. Clone that specific branch or download the files.
-3. Place the theme folder into your SDDM themes directory (usually `/usr/share/sddm/themes/`).
-4. Update your `/etc/sddm.conf` to apply the new theme.
+```sh
+git clone -b noctalia https://github.com/mahaveergurjar/sddm.git
+```
+
+### 2. Install the theme
+
+Move the theme folder to the SDDM themes directory:
+
+```sh
+sudo cp -r sddm /usr/share/sddm/themes/
+```
+
+### 3. Configure SDDM
+
+Edit your SDDM configuration file to use the new theme:
+
+```sh
+sudo nano /etc/sddm.conf
+```
+
+Add or modify the `[Theme]` section:
+
+```ini
+[Theme]
+Current=sddm
+```
+
+### 4. Restart SDDM
+
+To apply the changes, restart the display manager:
+
+```sh
+sudo systemctl restart sddm
+```
+
+## Configuration
+
+You can customize colors, background, and blur settings in `theme.conf`:
+
+```ini
+[General]
+background=Assets/background.png
+blurRadius=0
+# Rose Pine Color Palette overrides...
+```
+
+## Preview
+
+You can test the theme without logging out by running the sddm-greeter in test mode:
+
+```sh
+sddm-greeter-qt6 --test-mode --theme /usr/share/sddm/themes/sddm
+```
+
+_Note: If you run into "module is not installed" errors, ensure you are using `sddm-greeter-qt6` and have `qt6-5compat` and `qt6-declarative` installed._
+
+## Credits
+
+- Designed for **Noctalia Shell**.
+- Uses **Rose Pine** color palette.
+
+---
+
+**Contributions are welcome!** Feel free to fork and submit pull requests.
