@@ -1,83 +1,151 @@
 # Noctalia SDDM Theme
 
-Noctalia SDDM is a cozy, elegant login theme for **SDDM (Simple Desktop Display Manager)**, designed to complement the **Noctalia Shell** experience. It mimics the warm, dark aesthetic of the Rose Pine color palette, featuring rounded corners, smooth scaling, and a clean, modern interface tailored for Hyprland and KDE users.
+A cozy, elegant login theme for **SDDM**, designed to complement the **Noctalia Shell** experience. Features dynamic color syncing from Noctalia's wallpaper-based theming engine, animated blur on password input, and smart avatar detection.
 
 ![Noctalia SDDM Preview](Assets/preview.png)
 
 ## Features
 
-- **Rose Pine Aesthetic** – A soothing, high-contrast dark theme using the Rose Pine palette.
-- **Responsive Scaling** – Automatically adapts to 1080p, 1440p, and 4K resolutions.
-- **Smart Avatar Handling** – Automatically detects user profile pictures or gracefully falls back to defaults.
-- **Session Management** – Built-in support for switching desktop sessions (Wayland/X11).
-- **Integrated Power Controls** – Suspend, Reboot, and Shutdown accessible directly from the login screen.
-- **Customizable Configuration** – easy tweaks via `theme.conf`.
+- **Dynamic Color Sync** — Colors update automatically from Noctalia's theming engine via a post-hook.
+- **Wallpaper Sync** — Login screen wallpaper mirrors your current desktop wallpaper.
+- **Avatar Sync** — User avatar is pulled from Noctalia settings with multiple fallbacks.
+- **Animated Focus Blur** — Background blurs smoothly when you start typing your password.
+- **Responsive Scaling** — Adapts to 1080p, 1440p, and 4K resolutions (scale clamp 0.75–2.0).
+- **Smart Avatar Handling** — Falls back through AccountsService, `~/.face`, SDDM faces, and theme logo.
+- **Session Management** — Switch between Wayland/X11 sessions from the login screen.
+- **Integrated Power Controls** — Suspend, Reboot, and Shutdown directly from the login screen.
+- **Customizable** — Colors, blur, and avatar path configurable via `theme.conf`.
+
+## Requirements
+
+- `sddm-greeter-qt6`
+- `qt6-5compat` (provides `Qt5Compat.GraphicalEffects`)
+- `qt6-declarative`
+- [Noctalia Shell](https://github.com/noctalia) (for color/wallpaper/avatar sync)
 
 ## Installation
 
 ### 1. Clone the repository
 
 ```sh
-git clone -b noctalia https://github.com/mahaveergurjar/sddm.git
+git clone -b main https://github.com/blackcityskyline/noctalia-sddm.git
 ```
 
 ### 2. Install the theme
 
-Move the theme folder to the SDDM themes directory:
+Copy to your local SDDM themes directory (no root required):
 
 ```sh
-sudo cp -r sddm /usr/share/sddm/themes/
+mkdir -p ~/.local/share/sddm/themes/
+cp -r noctalia-sddm ~/.local/share/sddm/themes/
 ```
 
 ### 3. Configure SDDM
-
-Edit your SDDM configuration file to use the new theme:
 
 ```sh
 sudo nano /etc/sddm.conf
 ```
 
-Add or modify the `[Theme]` section:
-
 ```ini
 [Theme]
-Current=sddm
+Current=noctalia-sddm
+ThemeDir=/home/YOUR_USERNAME/.local/share/sddm/themes
 ```
 
 ### 4. Restart SDDM
-
-To apply the changes, restart the display manager:
 
 ```sh
 sudo systemctl restart sddm
 ```
 
+## Noctalia Integration (optional)
+
+For automatic color, wallpaper, and avatar sync with Noctalia Shell:
+
+### 1. Add the sync script
+
+Copy `noctalia-sddm-colors` to your PATH and make it executable:
+
+```sh
+cp noctalia-sddm-colors ~/bin/noctalia-sddm-colors
+chmod +x ~/bin/noctalia-sddm-colors
+```
+
+### 2. Add the template
+
+Copy the template to Noctalia's templates directory:
+
+```sh
+cp sddm-theme.conf.template ~/.config/noctalia/templates/
+```
+
+Add to `~/.config/noctalia/user-templates.toml`:
+
+```toml
+[templates.sddm]
+input_path = "~/.config/noctalia/templates/sddm-theme.conf.template"
+output_path = "~/.cache/noctalia/sddm-theme.conf"
+```
+
+### 3. Add the hook
+
+In Noctalia Shell settings → Hooks → **Colors generated**:
+
+```
+~/bin/noctalia-sddm-colors noctalia-sddm
+```
+
+Now every time you change your wallpaper or color scheme, the SDDM theme updates automatically.
+
 ## Configuration
 
-You can customize colors, background, and blur settings in `theme.conf`:
+`theme.conf` supports the following options:
 
 ```ini
 [General]
+# Path to background image (overridden by sync script if using Noctalia)
 background=Assets/background.png
+
+# Static background blur radius (0 = off)
 blurRadius=0
-# Rose Pine Color Palette overrides...
+
+# Blur radius when typing password (0 = off)
+focusBlurRadius=32
+
+# Avatar path (synced automatically by noctalia-sddm-colors)
+avatarPath=/home/user/Pictures/avatar.jpg
+
+# Color palette (synced automatically from Noctalia)
+mPrimary=#c7a1d8
+mOnPrimary=#1a151f
+mSecondary=#a984c4
+mOnSecondary=#f3edf7
+mTertiary=#e0b7c9
+mOnTertiary=#20161f
+mError=#e9899d
+mOnError=#1e1418
+mSurface=#1c1822
+mOnSurface=#e9e4f0
+mSurfaceVariant=#262130
+mOnSurfaceVariant=#a79ab0
+mOutline=#342c42
+mShadow=#120f18
+mHover=#e0b7c9
+mOnHover=#20161f
 ```
 
-## Preview
+## Testing
 
-You can test the theme without logging out by running the sddm-greeter in test mode:
+Test the theme without logging out:
 
 ```sh
-sddm-greeter-qt6 --test-mode --theme /usr/share/sddm/themes/sddm
+sddm-greeter-qt6 --test-mode --theme ~/.local/share/sddm/themes/noctalia-sddm/
 ```
 
-_Note: If you run into "module is not installed" errors, ensure you are using `sddm-greeter-qt6` and have `qt6-5compat` and `qt6-declarative` installed._
+> If you see "module is not installed" errors, install `qt6-5compat`.
 
 ## Credits
 
 - Designed for **Noctalia Shell**.
-- Uses **Rose Pine** color palette.
-
----
-
-**Contributions are welcome!** Feel free to fork and submit pull requests.
+- Original theme by [mahaveergurjar](https://github.com/mahaveergurjar).
+- Noctalia integration, UI fixes, and sync tooling by [blackcityskyline](https://github.com/blackcityskyline).
