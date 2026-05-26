@@ -466,10 +466,9 @@ Rectangle {
                 Layout.alignment: Qt.AlignVCenter
                 spacing: 2 * scaleFactor
 
-                MouseArea {
-                    anchors.fill: parent
+                TapHandler {
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: userPopup.open()
+                    onTapped: userPopup.open()
                 }
 
                 Text {
@@ -797,7 +796,7 @@ Rectangle {
                         font.pixelSize: 14 * scaleFactor
                         focus: true
                         KeyNavigation.tab: loginButton
-                        Keys.onPressed: {
+                        Keys.onPressed: function(event) {
                             if (event.key === Qt.Key_CapsLock) {
                                 root.capsLockOn = !root.capsLockOn
                                 event.accepted = true
@@ -927,6 +926,7 @@ Rectangle {
                         width: parent.width
                         text: model.name || ""
                         highlighted: sessionList.highlightedIndex === index
+                        hoverEnabled: true
                         contentItem: Text {
                             text: parent.text
                             color: root.mOnSurface
@@ -934,12 +934,21 @@ Rectangle {
                             verticalAlignment: Text.AlignVCenter
                         }
                         background: Rectangle {
-                            color: parent.highlighted ? root.mSurfaceVariant : "transparent"
+                            color: parent.highlighted || parent.hovered
+                                   ? Qt.lighter(root.mSurfaceVariant, 1.4)
+                                   : "transparent"
+                            Behavior on color { ColorAnimation { duration: 150 } }
                         }
                     }
+                    hoverEnabled: true
                     background: Rectangle {
-                        color: root.mSurfaceVariant
+                        color: sessionList.pressed
+                               ? Qt.darker(root.mSurfaceVariant, 1.3)
+                               : sessionList.hovered
+                                 ? Qt.lighter(root.mSurfaceVariant, 1.4)
+                                 : root.mSurfaceVariant
                         radius: root.radiusInner
+                        Behavior on color { ColorAnimation { duration: 150 } }
                     }
                     contentItem: Text {
                         leftPadding: 10 * scaleFactor
@@ -973,9 +982,15 @@ Rectangle {
                 component PowerButton: Controls.Button {
                     Layout.preferredHeight: 36 * scaleFactor
                     Layout.preferredWidth: loginButton.width
+                    hoverEnabled: true
                     background: Rectangle {
-                        color: parent.down ? Qt.darker(root.mSurfaceVariant, 1.2) : root.mSurfaceVariant
+                        color: parent.down
+                               ? Qt.darker(root.mSurfaceVariant, 1.3)
+                               : parent.hovered
+                                 ? Qt.lighter(root.mSurfaceVariant, 1.4)
+                                 : root.mSurfaceVariant
                         radius: root.radiusInner
+                        Behavior on color { ColorAnimation { duration: 150 } }
                     }
                     contentItem: Text {
                         text: parent.text
@@ -986,9 +1001,9 @@ Rectangle {
                     }
                 }
 
-                PowerButton { id: suspendButton;  text: "󰤄  Suspend";  KeyNavigation.tab: rebootButton;   onClicked: sddm.suspend()  }
-                PowerButton { id: rebootButton;   text: "󰜉  Reboot";   KeyNavigation.tab: shutdownButton;  onClicked: sddm.reboot()   }
-                PowerButton { id: shutdownButton; text: "󰐥  Shutdown"; KeyNavigation.tab: passwordBox;     onClicked: sddm.powerOff() }
+                PowerButton { id: suspendButton;  text: "Suspend";  KeyNavigation.tab: rebootButton;   onClicked: sddm.suspend()  }
+                PowerButton { id: rebootButton;   text: "Reboot";   KeyNavigation.tab: shutdownButton;  onClicked: sddm.reboot()   }
+                PowerButton { id: shutdownButton; text: "Shutdown"; KeyNavigation.tab: passwordBox;     onClicked: sddm.powerOff() }
             }
         }
     }
