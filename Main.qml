@@ -46,9 +46,15 @@ Rectangle {
 
     readonly property string backgroundPath: config.background || "Assets/background.png"
 
+    // DEBUG: true = read debug_battery.json, false = read /sys/class/power_supply/
+    property bool debugBattery: true
+
+    FontLoader {
+        id: nerdFont
+        source: "/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf"
+    }
+
     // Blur config
-    // blurRadius      — static background blur (0 = off)
-    // focusBlurRadius — blur that kicks in when typing password (0 = off)
     readonly property real blurRadius:      parseFloat(config.blurRadius)      || 0
     readonly property real focusBlurRadius: parseFloat(config.focusBlurRadius) || 32
 
@@ -124,8 +130,16 @@ Rectangle {
     Rectangle {
         id: headerCard
         anchors.top: parent.top
-        anchors.topMargin: parent.height * 0.12
+        anchors.topMargin: parent.height * 0.12 + 20 * scaleFactor
         anchors.horizontalCenter: parent.horizontalCenter
+        opacity: 0
+
+        Component.onCompleted: fadeInHeader.start()
+        ParallelAnimation {
+            id: fadeInHeader
+            NumberAnimation { target: headerCard; property: "opacity"; to: 1; duration: 1000; easing.type: Easing.OutCubic }
+            NumberAnimation { target: headerCard; property: "anchors.topMargin"; to: root.height * 0.12; duration: 1000; easing.type: Easing.OutCubic }
+        }
 
         width: Math.max(400 * scaleFactor, Math.min(parent.width * 0.70, 550 * scaleFactor))
         height: 120 * scaleFactor
@@ -142,113 +156,126 @@ Rectangle {
 
             // ---- Avatar ----
             Item {
-                id: avatarRect
+                id: avatarContainer
                 Layout.preferredWidth: 70 * scaleFactor
                 Layout.preferredHeight: 70 * scaleFactor
                 Layout.alignment: Qt.AlignVCenter
 
-                width: 70 * scaleFactor
-                height: 70 * scaleFactor
-
-                property int tryIndex: 0
-
-                property string primaryUser:     userModel.lastUser
-                property string currentIcon:     ""
-                property string currentHome:     ""
-                property string currentRealName: ""
-                property string firstUserName:   ""
-
-                Repeater {
-                    model: userModel
-                    delegate: Item {
-                        visible: false
-                        Binding { target: avatarRect; property: "firstUserName";   value: model.name;     when: index === 0 }
-                        Binding { target: avatarRect; property: "currentIcon";     value: model.icon;     when: model.name === avatarRect.displayUser }
-                        Binding { target: avatarRect; property: "currentHome";     value: model.homeDir;  when: model.name === avatarRect.displayUser }
-                        Binding { target: avatarRect; property: "currentRealName"; value: model.realName; when: model.name === avatarRect.displayUser }
-                    }
-                }
-
-                property string displayUser: primaryUser !== "" ? primaryUser : firstUserName
-                property string displayName: currentRealName !== "" ? currentRealName : (displayUser !== "" ? displayUser : "User")
-
-                onDisplayUserChanged: { tryIndex = 0 }
-
-                property var iconPaths: {
-                    var paths = []
-                    var u = displayUser
-                    if (u) {
-                        // 0. Noctalia avatar (from theme.conf, synced by post_hook)
-                        if (config.avatarPath && config.avatarPath !== "")
-                            paths.push("file://" + config.avatarPath)
-                        // 1. Path from userModel / AccountsService
-                        if (currentIcon && currentIcon !== "") {
-                            var p = currentIcon
-                            if (p.indexOf("://") === -1 && p.charAt(0) === '/')
-                                p = "file://" + p
-                            paths.push(p)
-                        }
-                        // 2. AccountsService standard location
-                        paths.push("file:///var/lib/AccountsService/icons/" + u)
-                        // 3. Home directory faces
-                        if (currentHome) {
-                            paths.push("file://" + currentHome + "/.face.icon")
-                            paths.push("file://" + currentHome + "/.face")
-                        }
-                        // 4. SDDM system faces
-                        paths.push("file:///usr/share/sddm/faces/" + u + ".face.icon")
-                    }
-                    // 5. SDDM default face
-                    paths.push("file:///usr/share/sddm/faces/.face.icon")
-                    return paths
+                SequentialAnimation {
+                    running: true
+                    loops: Animation.Infinite
+                    NumberAnimation { target: avatarContainer; property: "scale"; from: 1.0; to: 1.06; duration: 1800; easing.type: Easing.InOutSine }
+                    NumberAnimation { target: avatarContainer; property: "scale"; from: 1.06; to: 1.0; duration: 1800; easing.type: Easing.InOutSine }
                 }
 
                 Rectangle {
-                    id: avatarMask
-                    anchors.fill: parent
-                    radius: width / 2
-                    visible: false
-                }
-
-                Image {
-                    id: userAvatar
-                    anchors.fill: parent
-                    source: {
-                        if (parent.iconPaths.length === 0) return ""
-                        return parent.iconPaths[Math.min(parent.tryIndex, parent.iconPaths.length - 1)]
-                    }
-                    sourceSize: Qt.size(70 * scaleFactor, 70 * scaleFactor)
-                    fillMode: Image.PreserveAspectCrop
-                    smooth: true
-                    visible: status === Image.Ready
-                    asynchronous: true
-                    layer.enabled: true
-                    layer.effect: OpacityMask { maskSource: avatarMask }
-                    onStatusChanged: {
-                        if (status === Image.Error && parent.tryIndex < parent.iconPaths.length - 1)
-                            parent.tryIndex++
-                    }
-                }
-
-                Image {
-                    id: fallbackLogo
-                    anchors.fill: parent
-                    anchors.margins: 8 * scaleFactor
-                    source: "Assets/logo.svg"
-                    sourceSize: Qt.size(70 * scaleFactor, 70 * scaleFactor)
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    visible: userAvatar.status !== Image.Ready && userAvatar.status !== Image.Loading
-                    layer.enabled: true
-                    layer.effect: OpacityMask { maskSource: avatarMask }
-                }
-
-                Rectangle {
-                    anchors.fill: parent
+                    id: avatarBorder
+                    anchors.centerIn: parent
+                    width: parent.width + 4 * scaleFactor
+                    height: parent.height + 4 * scaleFactor
                     radius: width / 2
                     color: "transparent"
-                    border.color: root.mPrimary
+                    property color animColor: "#c7a1d8"
                     border.width: 2 * scaleFactor
+                    border.color: animColor
+
+                    SequentialAnimation {
+                        running: true
+                        loops: Animation.Infinite
+                        ColorAnimation { target: avatarBorder; property: "animColor"; from: "#c7a1d8"; to: "#ff6eb4"; duration: 2000; easing.type: Easing.InOutSine }
+                        ColorAnimation { target: avatarBorder; property: "animColor"; from: "#ff6eb4"; to: "#6eb4ff"; duration: 2000; easing.type: Easing.InOutSine }
+                        ColorAnimation { target: avatarBorder; property: "animColor"; from: "#6eb4ff"; to: "#ffe066"; duration: 2000; easing.type: Easing.InOutSine }
+                        ColorAnimation { target: avatarBorder; property: "animColor"; from: "#ffe066"; to: "#c7a1d8"; duration: 2000; easing.type: Easing.InOutSine }
+                    }
+                }
+
+                Item {
+                    id: avatarRect
+                    anchors.centerIn: parent
+                    width: 70 * scaleFactor
+                    height: 70 * scaleFactor
+
+                    property int tryIndex: 0
+                    property string primaryUser:     userModel.lastUser
+                    property string currentIcon:     ""
+                    property string currentHome:     ""
+                    property string currentRealName: ""
+                    property string firstUserName:   ""
+                    property string displayUser: primaryUser !== "" ? primaryUser : firstUserName
+                    property string displayName: currentRealName !== "" ? currentRealName : (displayUser !== "" ? displayUser : "User")
+
+                    onDisplayUserChanged: { tryIndex = 0 }
+
+                    property var iconPaths: {
+                        var paths = []
+                        var u = displayUser
+                        if (u) {
+                            if (config.avatarPath && config.avatarPath !== "")
+                                paths.push("file://" + config.avatarPath)
+                            if (currentIcon && currentIcon !== "") {
+                                var p = currentIcon
+                                if (p.indexOf("://") === -1 && p.charAt(0) === '/')
+                                    p = "file://" + p
+                                paths.push(p)
+                            }
+                            paths.push("file:///var/lib/AccountsService/icons/" + u)
+                            if (currentHome) {
+                                paths.push("file://" + currentHome + "/.face.icon")
+                                paths.push("file://" + currentHome + "/.face")
+                            }
+                            paths.push("file:///usr/share/sddm/faces/" + u + ".face.icon")
+                        }
+                        paths.push("file:///usr/share/sddm/faces/.face.icon")
+                        return paths
+                    }
+
+                    Repeater {
+                        model: userModel
+                        delegate: Item {
+                            visible: false
+                            Binding { target: avatarRect; property: "firstUserName";   value: model.name;     when: index === 0 }
+                            Binding { target: avatarRect; property: "currentIcon";     value: model.icon;     when: model.name === avatarRect.displayUser }
+                            Binding { target: avatarRect; property: "currentHome";     value: model.homeDir;  when: model.name === avatarRect.displayUser }
+                            Binding { target: avatarRect; property: "currentRealName"; value: model.realName; when: model.name === avatarRect.displayUser }
+                        }
+                    }
+
+                    Rectangle {
+                        id: avatarMask
+                        anchors.fill: parent
+                        radius: width / 2
+                        visible: false
+                    }
+
+                    Image {
+                        id: userAvatar
+                        anchors.fill: parent
+                        source: parent.iconPaths.length > 0 ? parent.iconPaths[Math.min(parent.tryIndex, parent.iconPaths.length - 1)] : ""
+                        sourceSize: Qt.size(70 * scaleFactor, 70 * scaleFactor)
+                        fillMode: Image.PreserveAspectCrop
+                        smooth: true
+                        visible: status === Image.Ready
+                        asynchronous: true
+                        layer.enabled: true
+                        layer.effect: OpacityMask { maskSource: avatarMask }
+                        onStatusChanged: {
+                            if (status === Image.Error && parent.tryIndex < parent.iconPaths.length - 1)
+                                parent.tryIndex++
+                        }
+                    }
+
+                    Image {
+                        id: fallbackLogo
+                        anchors.fill: parent
+                        anchors.margins: 8 * scaleFactor
+                        source: "Assets/logo.svg"
+                        sourceSize: Qt.size(70 * scaleFactor, 70 * scaleFactor)
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        visible: userAvatar.status !== Image.Ready && userAvatar.status !== Image.Loading
+                        layer.enabled: true
+                        layer.effect: OpacityMask { maskSource: avatarMask }
+                    }
                 }
             }
 
@@ -280,11 +307,10 @@ Rectangle {
 
             Item { Layout.fillWidth: true }
 
-            // ---- Clock ----
-            Item {
+            // ---- Clock + Battery ----
+            ColumnLayout {
                 Layout.alignment: Qt.AlignVCenter
-                Layout.preferredWidth: clockText.implicitWidth
-                Layout.preferredHeight: clockText.implicitHeight
+                spacing: 4 * scaleFactor
 
                 Text {
                     id: clockText
@@ -292,13 +318,128 @@ Rectangle {
                     font.pixelSize: root.fontSizeClock
                     font.bold: true
                     color: root.mOnSurface
+                    Layout.alignment: Qt.AlignHCenter
+
+                    Timer {
+                        interval: 1000
+                        running: true
+                        repeat: true
+                        onTriggered: clockText.text = Qt.formatTime(new Date(), "hh:mm")
+                    }
                 }
 
-                Timer {
-                    interval: 1000
-                    running: true
-                    repeat: true
-                    onTriggered: clockText.text = Qt.formatTime(new Date(), "hh:mm")
+                // ---- Battery / AC ----
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 6 * scaleFactor
+
+                    // Иконка батареи
+                    Text {
+                        text: {
+                            // Если шрифт не загружен – показываем короткий текст
+                            if (nerdFont.status !== FontLoader.Ready) {
+                                if (batteryReader.percent < 0) return "N/A"
+                                return batteryReader.charging ? "CHG" : "BAT"
+                            }
+
+                            // Когда идёт зарядка – используем иконки battery-charging-*
+                            if (batteryReader.charging) {
+                                if (batteryReader.percent >= 95) return "󰂅" 
+                                if (batteryReader.percent >= 90) return "󰂋"
+                                if (batteryReader.percent >= 80) return "󰂊"
+                                if (batteryReader.percent >= 70) return "󰂉"
+                                if (batteryReader.percent >= 60) return "󰢝"
+                                if (batteryReader.percent >= 50) return "󰢝"
+                                if (batteryReader.percent >= 40) return "󰂈"
+                                if (batteryReader.percent >= 30) return "󰂇"
+                                if (batteryReader.percent >= 20) return "󰂆"
+                                if (batteryReader.percent >= 10) return "󰢜"
+                                return "󰢟"
+                            }
+
+                            // Обычный разряд
+                            if (batteryReader.percent >= 95) return "󰁹"
+                            if (batteryReader.percent >= 90) return "󰂂"
+                            if (batteryReader.percent >= 80) return "󰂁"
+                            if (batteryReader.percent >= 70) return "󰂀"
+                            if (batteryReader.percent >= 60) return "󰁿"
+                            if (batteryReader.percent >= 50) return "󰁾"
+                            if (batteryReader.percent >= 40) return "󰁽"
+                            if (batteryReader.percent >= 30) return "󰁼"
+                            if (batteryReader.percent >= 20) return "󰁻"
+                            if (batteryReader.percent >= 10) return "󰁺"
+                            if (batteryReader.percent >= 1)  return "󱃍"
+                            return "󱉞"
+                        }
+                        font.pixelSize: root.fontSizeL
+                        font.family: nerdFont.status === FontLoader.Ready ? nerdFont.name : ""
+                        color: batteryReader.color
+                    }
+
+                    // Процент или No battery
+                    Text {
+                        text: batteryReader.percent >= 0 ? batteryReader.percent + "%" : "No battery"
+                        font.pixelSize: root.fontSizeM
+                        color: batteryReader.color
+                    }
+
+                    QtObject {
+                        id: batteryReader
+                        property int percent: -1
+                        property bool charging: false
+
+                        // Красный → Жёлтый → Белый → Зелёный
+                        property color color: {
+                            if (percent < 0)   return root.mOnSurfaceVariant
+                            if (percent <= 20) return root.mError
+                            if (percent <= 50) return "#ffe066"
+                            if (percent <= 75) return "#ffffff"
+                            return "#4caf50"
+                        }
+
+                        function readXhr(path, callback) {
+                            var xhr = new XMLHttpRequest()
+                            xhr.open("GET", path, true)
+                            xhr.onreadystatechange = function() {
+                                if (xhr.readyState === XMLHttpRequest.DONE)
+                                    callback(xhr.responseText.trim())
+                            }
+                            xhr.send()
+                        }
+
+                        function update() {
+                            if (debugBattery) {
+                                readXhr(Qt.resolvedUrl("debug_battery.json"), function(v) {
+                                    try {
+                                        var d = JSON.parse(v)
+                                        percent = (d.percent !== undefined) ? d.percent : -1
+                                        charging = d.charging || false
+                                        console.log("Battery update (debug):", percent, charging)
+                                    } catch(e) {
+                                        percent = -1; charging = false
+                                        console.log("Error parsing debug_battery.json:", e)
+                                    }
+                                })
+                            } else {
+                                readXhr("file:///sys/class/power_supply/BAT0/capacity", function(v) {
+                                    if (v !== "") { percent = parseInt(v); return }
+                                    readXhr("file:///sys/class/power_supply/BAT1/capacity", function(v2) {
+                                        if (v2 !== "") percent = parseInt(v2)
+                                    })
+                                })
+                                readXhr("file:///sys/class/power_supply/BAT0/status", function(v) {
+                                    if (v !== "") { charging = (v === "Charging"); return }
+                                    readXhr("file:///sys/class/power_supply/BAT1/status", function(v2) {
+                                        charging = (v2 === "Charging")
+                                    })
+                                })
+                            }
+                        }
+
+                        Component.onCompleted: update()
+                    }
+
+                    Timer { interval: 5000; running: true; repeat: true; onTriggered: batteryReader.update() }
                 }
             }
         }
@@ -310,8 +451,14 @@ Rectangle {
     Rectangle {
         id: bottomCard
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 100 * scaleFactor
         anchors.horizontalCenter: parent.horizontalCenter
+        opacity: 0
+
+        Component.onCompleted: fadeInBottom.start()
+        ParallelAnimation {
+            id: fadeInBottom
+            NumberAnimation { target: bottomCard; property: "opacity"; to: 1; duration: 1000; easing.type: Easing.OutCubic; from: 0 }
+        }
 
         width: Math.min(750 * scaleFactor, parent.width * 0.9)
         height: 140 * scaleFactor
@@ -319,6 +466,12 @@ Rectangle {
         color: root.mSurface
         border.color: Qt.rgba(root.mOutline.r, root.mOutline.g, root.mOutline.b, 0.2)
         border.width: 1 * scaleFactor
+
+        property real activeBottomMargin: passwordBox.text.length > 0 ? 88 * scaleFactor : 100 * scaleFactor
+        anchors.bottomMargin: activeBottomMargin
+        Behavior on activeBottomMargin {
+            NumberAnimation { duration: 250; easing.type: Easing.InOutQuad }
+        }
 
         ColumnLayout {
             anchors.fill: parent
@@ -331,7 +484,6 @@ Rectangle {
                 Layout.preferredHeight: 50 * scaleFactor
                 spacing: 15 * scaleFactor
 
-                // Input Box
                 Rectangle {
                     id: passwordFieldRect
                     Layout.fillWidth: true
@@ -339,6 +491,9 @@ Rectangle {
                     color: root.mSurfaceVariant
                     radius: 12 * scaleFactor
                     clip: true
+                    border.width: 2 * scaleFactor
+                    border.color: passwordBox.text.length > 0 ? root.mPrimary : "transparent"
+                    Behavior on border.color { ColorAnimation { duration: 200 } }
 
                     Row {
                         id: symbolsWrapper
@@ -434,7 +589,6 @@ Rectangle {
                         }
                     }
 
-                    // Invisible TextInput that captures keystrokes
                     TextInput {
                         id: passwordBox
                         anchors.fill: parent
@@ -454,7 +608,6 @@ Rectangle {
                         }
                     }
 
-                    // Placeholder text
                     Text {
                         anchors.fill: parent
                         anchors.margins: 15 * scaleFactor
@@ -466,7 +619,6 @@ Rectangle {
                     }
                 }
 
-                // Login Button
                 Controls.Button {
                     Layout.preferredWidth: 100 * scaleFactor
                     Layout.fillHeight: true
@@ -601,11 +753,24 @@ Rectangle {
         }
     }
 
+    // Shake animation for wrong password
+    SequentialAnimation {
+        id: shakeAnimation
+        PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to: -18; duration: 50 }
+        PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to:  18; duration: 50 }
+        PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to: -12; duration: 50 }
+        PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to:  12; duration: 50 }
+        PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to:  -6; duration: 50 }
+        PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to:   6; duration: 50 }
+        PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to:   0; duration: 50 }
+    }
+
     Connections {
         target: sddm
         function onLoginFailed() {
             passwordBox.text = ""
             errorMessage.text = "Authentication failed"
+            shakeAnimation.start()
         }
     }
 }
