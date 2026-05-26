@@ -48,11 +48,7 @@ Rectangle {
     readonly property string backgroundPath:  config.background    || "Assets/background.png"
     readonly property real   blurRadius:      parseFloat(config.blurRadius)      || 0
     readonly property real   focusBlurRadius: parseFloat(config.focusBlurRadius) || 32
-    readonly property string keyboardLayout: {
-        if (typeof keyboard !== "undefined" && keyboard.layouts && keyboard.layouts.length > 0)
-            return keyboard.layouts[keyboard.currentLayout].shortName.toUpperCase()
-        return config.keyboardLayout || Qt.locale().name.substring(0, 2).toUpperCase()
-    }
+    readonly property string keyboardLayout:  config.keyboardLayout || Qt.locale().name.substring(0, 2).toUpperCase()
 
     property bool   debugBattery: true
     property string selectedUser: ""
@@ -776,24 +772,10 @@ Rectangle {
                         spacing: 2 * scaleFactor
 
                         Text {
-                            id: layoutIndicator
                             text: root.keyboardLayout
                             font.pixelSize: root.fontSizeM
-                            color: layoutMouseArea.containsMouse ? root.mPrimary : root.mOnSurfaceVariant
+                            color: root.mOnSurfaceVariant
                             anchors.horizontalCenter: parent.horizontalCenter
-                            Behavior on color { ColorAnimation { duration: 150 } }
-
-                            MouseArea {
-                                id: layoutMouseArea
-                                anchors.fill: parent
-                                anchors.margins: -6 * scaleFactor
-                                cursorShape: Qt.PointingHandCursor
-                                hoverEnabled: true
-                                visible: typeof keyboard !== "undefined" && keyboard.layouts && keyboard.layouts.length > 1
-                                onClicked: {
-                                    keyboard.currentLayout = (keyboard.currentLayout + 1) % keyboard.layouts.length
-                                }
-                            }
                         }
                         Text {
                             visible: root.capsLockOn
@@ -930,7 +912,7 @@ Rectangle {
             // --- Session & power controls ---
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 10 * scaleFactor
+                spacing: 15 * scaleFactor
 
                 Controls.ComboBox {
                     id: sessionList
@@ -990,7 +972,7 @@ Rectangle {
 
                 component PowerButton: Controls.Button {
                     Layout.preferredHeight: 36 * scaleFactor
-                    Layout.preferredWidth: 100 * scaleFactor
+                    Layout.preferredWidth: loginButton.width
                     background: Rectangle {
                         color: parent.down ? Qt.darker(root.mSurfaceVariant, 1.2) : root.mSurfaceVariant
                         radius: root.radiusInner
