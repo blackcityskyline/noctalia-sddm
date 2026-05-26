@@ -26,7 +26,10 @@ Rectangle {
     readonly property color mSurfaceVariant:   config.mSurfaceVariant   || "#262130"
     readonly property color mOnSurface:        config.mOnSurface        || "#e9e4f0"
     readonly property color mOnSurfaceVariant: config.mOnSurfaceVariant || "#a79ab0"
+    readonly property color mTertiary:         config.mTertiary         || "#d8c68d"
+    readonly property color mOnTertiary:       config.mOnTertiary       || "#3a3005"
     readonly property color mError:            config.mError            || "#e9899d"
+    readonly property color mOnError:          config.mOnError          || "#690005"
     readonly property color mOutline:          config.mOutline          || "#342c42"
 
     // --- Radii: outer for cards/popups, inner for buttons/fields ---
@@ -45,11 +48,16 @@ Rectangle {
     readonly property string backgroundPath:  config.background    || "Assets/background.png"
     readonly property real   blurRadius:      parseFloat(config.blurRadius)      || 0
     readonly property real   focusBlurRadius: parseFloat(config.focusBlurRadius) || 32
-    readonly property string keyboardLayout:  config.keyboardLayout || Qt.locale().name.substring(0, 2).toUpperCase()
+    readonly property string keyboardLayout: {
+        if (typeof keyboard !== "undefined" && keyboard.layouts && keyboard.layouts.length > 0)
+            return keyboard.layouts[keyboard.currentLayout].shortName.toUpperCase()
+        return config.keyboardLayout || Qt.locale().name.substring(0, 2).toUpperCase()
+    }
 
     property bool   debugBattery: true
     property string selectedUser: ""
     property bool   capsLockOn:   false
+    property string loginState:   "idle"   // idle | trying | success | error
 
     FontLoader {
         id: nerdFont
@@ -80,13 +88,24 @@ Rectangle {
 
     Connections {
         target: sddm
-        function onLoginSucceeded() { fadeOut.start() }
+        function onLoginSucceeded() {
+            root.loginState = "success"
+            fadeOut.start()
+        }
         function onLoginFailed() {
             passwordBox.text = ""
             errorMessage.text = "Authentication failed"
             errorTimer.restart()
+            root.loginState = "error"
             shakeAnimation.start()
+            errorStateTimer.restart()
         }
+    }
+
+    Timer {
+        id: errorStateTimer
+        interval: 700
+        onTriggered: root.loginState = "idle"
     }
 
     // --- Background ---
@@ -757,10 +776,24 @@ Rectangle {
                         spacing: 2 * scaleFactor
 
                         Text {
+                            id: layoutIndicator
                             text: root.keyboardLayout
                             font.pixelSize: root.fontSizeM
-                            color: root.mOnSurfaceVariant
+                            color: layoutMouseArea.containsMouse ? root.mPrimary : root.mOnSurfaceVariant
                             anchors.horizontalCenter: parent.horizontalCenter
+                            Behavior on color { ColorAnimation { duration: 150 } }
+
+                            MouseArea {
+                                id: layoutMouseArea
+                                anchors.fill: parent
+                                anchors.margins: -6 * scaleFactor
+                                cursorShape: Qt.PointingHandCursor
+                                hoverEnabled: true
+                                visible: typeof keyboard !== "undefined" && keyboard.layouts && keyboard.layouts.length > 1
+                                onClicked: {
+                                    keyboard.currentLayout = (keyboard.currentLayout + 1) % keyboard.layouts.length
+                                }
+                            }
                         }
                         Text {
                             visible: root.capsLockOn
@@ -787,8 +820,10 @@ Rectangle {
                                 root.capsLockOn = !root.capsLockOn
                                 event.accepted = true
                             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                sddm.login(root.selectedUser !== "" ? root.selectedUser : userModel.lastUser,
-                                           passwordBox.text, sessionList.currentIndex)
+                                if (root.loginState === "idle" || root.loginState === "error") {
+                                    root.loginState = "trying"
+                                    loginTimer.start()
+                                }
                                 event.accepted = true
                             }
                         }
@@ -807,24 +842,89 @@ Rectangle {
 
                 Controls.Button {
                     id: loginButton
-                    Layout.preferredWidth: 100 * scaleFactor
+                    Layout.preferredWidth: 110 * scaleFactor
                     Layout.fillHeight: true
                     KeyNavigation.tab: sessionList
-                    onClicked: sddm.login(root.selectedUser !== "" ? root.selectedUser : userModel.lastUser,
-                                          passwordBox.text, sessionList.currentIndex)
+                    onClicked: {
+                        if (root.loginState === "idle" || root.loginState === "error") {
+                            root.loginState = "trying"
+                            loginTimer.start()
+                        }
+                    }
+
+                    Timer {
+                        id: loginTimer
+                        interval: 50
+                        onTriggered: sddm.login(
+                            root.selectedUser !== "" ? root.selectedUser : userModel.lastUser,
+                            passwordBox.text, sessionList.currentIndex)
+                    }
+
+                    // Resolved button colors based on loginState
+                    readonly property color btnBg: {
+                        if (root.loginState === "error")   return root.mError
+                        if (root.loginState === "success") return root.mTertiary
+                        return root.mPrimary
+                    }
+                    readonly property color btnFg: {
+                        if (root.loginState === "error")   return root.mOnError
+                        if (root.loginState === "success") return root.mOnTertiary
+                        return root.mOnPrimary
+                    }
+
                     background: Rectangle {
-                        color: parent.down ? Qt.darker(root.mPrimary, 1.2) : root.mPrimary
                         radius: root.radiusInner
+                        color: loginButton.down
+                               ? Qt.darker(loginButton.btnBg, 1.2)
+                               : loginButton.btnBg
+                        Behavior on color { ColorAnimation { duration: 200 } }
                     }
-                    contentItem: Text {
-                        text: "Login"
-                        font.pixelSize: 14 * scaleFactor
-                        font.bold: true
-                        color: root.mOnPrimary
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                }
+
+                    contentItem: Item {
+                        Row {
+                        anchors.centerIn: parent
+                        spacing: 5 * scaleFactor
+
+                        Text {
+                            id: lockIcon
+                            font.family: nerdFont.status === FontLoader.Ready ? nerdFont.name : ""
+                            font.pixelSize: 14 * scaleFactor
+                            color: loginButton.btnFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            Behavior on color { ColorAnimation { duration: 200 } }
+
+                            text: {
+                                if (nerdFont.status !== FontLoader.Ready) return ""
+                                if (root.loginState === "success") return "󰍁"
+                                if (root.loginState === "trying")  return "󰁪"
+                                return "󰌾"
+                            }
+
+                            SequentialAnimation {
+                                running: root.loginState === "trying"
+                                loops: Animation.Infinite
+                                NumberAnimation { target: lockIcon; property: "opacity"; to: 0.4; duration: 300; easing.type: Easing.InOutSine }
+                                NumberAnimation { target: lockIcon; property: "opacity"; to: 1.0; duration: 300; easing.type: Easing.InOutSine }
+                            }
+                            Connections {
+                                target: root
+                                function onLoginStateChanged() {
+                                    if (root.loginState !== "trying") lockIcon.opacity = 1.0
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: root.loginState === "trying" ? "Logging in" : "Login"
+                            font.pixelSize: 14 * scaleFactor
+                            font.bold: true
+                            color: loginButton.btnFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            Behavior on color { ColorAnimation { duration: 200 } }
+                        }
+                        } // Row
+                    }     // Item (contentItem)
+                }         // Controls.Button
             }
 
             // --- Session & power controls ---
@@ -904,9 +1004,9 @@ Rectangle {
                     }
                 }
 
-                PowerButton { id: suspendButton;  text: "Suspend";  KeyNavigation.tab: rebootButton;   onClicked: sddm.suspend()  }
-                PowerButton { id: rebootButton;   text: "Reboot";   KeyNavigation.tab: shutdownButton;  onClicked: sddm.reboot()   }
-                PowerButton { id: shutdownButton; text: "Shutdown"; KeyNavigation.tab: passwordBox;     onClicked: sddm.powerOff() }
+                PowerButton { id: suspendButton;  text: "󰤄  Suspend";  KeyNavigation.tab: rebootButton;   onClicked: sddm.suspend()  }
+                PowerButton { id: rebootButton;   text: "󰜉  Reboot";   KeyNavigation.tab: shutdownButton;  onClicked: sddm.reboot()   }
+                PowerButton { id: shutdownButton; text: "󰐥  Shutdown"; KeyNavigation.tab: passwordBox;     onClicked: sddm.powerOff() }
             }
         }
     }
