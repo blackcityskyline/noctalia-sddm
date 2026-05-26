@@ -12,60 +12,84 @@ Rectangle {
     width: Screen.width || 1366
     height: Screen.height || 768
 
-    // -------------------------------------------------------------------------
-    // Responsive Scaling
-    // Base: 1366x768 = 1.0. Clamps to [0.75, 2.0] for all screen sizes.
-    // -------------------------------------------------------------------------
+    // --- Scale & layout ---
     readonly property real scaleFactor: {
         var s = Math.min(width / 1366, height / 768)
-        if (s < 0.75) return 0.75
-        if (s > 2.0)  return 2.0
-        return s
+        return Math.max(0.75, Math.min(s, 2.0))
     }
     readonly property real baseUnit: 8 * scaleFactor
 
-    // -------------------------------------------------------------------------
-    // Theme Constants & Style Tokens
-    // -------------------------------------------------------------------------
-    readonly property color mPrimary:           config.mPrimary           || "#c7a1d8"
-    readonly property color mOnPrimary:         config.mOnPrimary         || "#1a151f"
-    readonly property color mSurface:           config.mSurface           || "#1c1822"
-    readonly property color mSurfaceVariant:    config.mSurfaceVariant    || "#262130"
-    readonly property color mOnSurface:         config.mOnSurface         || "#e9e4f0"
-    readonly property color mOnSurfaceVariant:  config.mOnSurfaceVariant  || "#a79ab0"
-    readonly property color mError:             config.mError             || "#e9899d"
-    readonly property color mOutline:           config.mOutline           || "#342c42"
+    // --- Color palette (Material You tokens) ---
+    readonly property color mPrimary:          config.mPrimary          || "#c7a1d8"
+    readonly property color mOnPrimary:        config.mOnPrimary        || "#1a151f"
+    readonly property color mSurface:          config.mSurface          || "#1c1822"
+    readonly property color mSurfaceVariant:   config.mSurfaceVariant   || "#262130"
+    readonly property color mOnSurface:        config.mOnSurface        || "#e9e4f0"
+    readonly property color mOnSurfaceVariant: config.mOnSurfaceVariant || "#a79ab0"
+    readonly property color mError:            config.mError            || "#e9899d"
+    readonly property color mOutline:          config.mOutline          || "#342c42"
 
-    // Responsive sizes
-    readonly property real radiusL:       20 * scaleFactor
+    // --- Radii: outer for cards/popups, inner for buttons/fields ---
+    readonly property real radiusOuter: 16 * scaleFactor
+    readonly property real radiusInner:  8 * scaleFactor
+    readonly property real radiusL: radiusOuter
+
+    // --- Typography ---
     readonly property real fontSizeM:     11 * scaleFactor
     readonly property real fontSizeL:     13 * scaleFactor
     readonly property real fontSizeXL:    16 * scaleFactor
     readonly property real fontSizeXXL:   18 * scaleFactor
     readonly property real fontSizeClock: 42 * scaleFactor
 
-    readonly property string backgroundPath: config.background || "Assets/background.png"
+    // --- Config ---
+    readonly property string backgroundPath:  config.background    || "Assets/background.png"
+    readonly property real   blurRadius:      parseFloat(config.blurRadius)      || 0
+    readonly property real   focusBlurRadius: parseFloat(config.focusBlurRadius) || 32
+    readonly property string keyboardLayout:  config.keyboardLayout || Qt.locale().name.substring(0, 2).toUpperCase()
 
-    // DEBUG: true = read debug_battery.json, false = read /sys/class/power_supply/
-    property bool debugBattery: true
+    property bool   debugBattery: true
+    property string selectedUser: ""
+    property bool   capsLockOn:   false
 
     FontLoader {
         id: nerdFont
         source: "/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf"
     }
 
-    // Blur config
-    readonly property real blurRadius:      parseFloat(config.blurRadius)      || 0
-    readonly property real focusBlurRadius: parseFloat(config.focusBlurRadius) || 32
-
-    property font fontMain: Qt.font({ family: "Noto Sans", pixelSize: 14 * scaleFactor })
-
     LayoutMirroring.enabled: Qt.locale().textDirection == Qt.RightToLeft
     LayoutMirroring.childrenInherit: true
 
-    // -------------------------------------------------------------------------
-    // Background — static wallpaper
-    // -------------------------------------------------------------------------
+    color: root.mSurface
+
+    Component.onCompleted: {
+        if (userModel.lastUser !== "")
+            selectedUser = userModel.lastUser
+        else if (userModel.count > 0)
+            selectedUser = userModel.get(0).name
+    }
+
+    // --- Login callbacks ---
+    NumberAnimation {
+        id: fadeOut
+        target: root
+        property: "opacity"
+        to: 0
+        duration: 600
+        easing.type: Easing.OutCubic
+    }
+
+    Connections {
+        target: sddm
+        function onLoginSucceeded() { fadeOut.start() }
+        function onLoginFailed() {
+            passwordBox.text = ""
+            errorMessage.text = "Authentication failed"
+            errorTimer.restart()
+            shakeAnimation.start()
+        }
+    }
+
+    // --- Background ---
     Image {
         id: wallpaper
         anchors.fill: parent
@@ -76,9 +100,6 @@ Rectangle {
         clip: true
     }
 
-    // -------------------------------------------------------------------------
-    // Background — always-on static blur (blurRadius in theme.conf)
-    // -------------------------------------------------------------------------
     FastBlur {
         id: staticBlur
         anchors.fill: parent
@@ -89,9 +110,6 @@ Rectangle {
         cached: true
     }
 
-    // -------------------------------------------------------------------------
-    // Background — animated focus blur (triggered by typing password)
-    // -------------------------------------------------------------------------
     FastBlur {
         id: focusBlur
         anchors.fill: parent
@@ -100,7 +118,6 @@ Rectangle {
         transparentBorder: false
         cached: false
         visible: radius > 0
-
         Behavior on radius {
             NumberAnimation { duration: 350; easing.type: Easing.InOutQuad }
         }
@@ -114,69 +131,220 @@ Rectangle {
         }
     }
 
-    // Dark vignette overlay
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(0,0,0,0.6) }
-            GradientStop { position: 0.4; color: Qt.rgba(0,0,0,0.2) }
-            GradientStop { position: 1.0; color: Qt.rgba(0,0,0,0.7) }
+            GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.6) }
+            GradientStop { position: 0.4; color: Qt.rgba(0, 0, 0, 0.2) }
+            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.7) }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Top Card: User Info & Time
-    // -------------------------------------------------------------------------
+    // =========================================================
+    // User switcher popup
+    // =========================================================
+    Controls.Popup {
+        id: userPopup
+        x: headerCard.x + headerCard.width / 2 - width / 2
+        y: headerCard.y + headerCard.height + 10 * scaleFactor
+        width: Math.min(300 * scaleFactor, root.width * 0.5)
+
+        readonly property real rowHeight:    56 * scaleFactor
+        readonly property real popupPadding:  6 * scaleFactor
+        readonly property int  visibleRows:  Math.min(Math.max(userModel.count, 1), 6)
+        height: visibleRows * rowHeight + popupPadding * 2
+
+        padding: 0
+        modal: true
+        closePolicy: Controls.Popup.CloseOnEscape | Controls.Popup.CloseOnPressOutside
+
+        background: Rectangle {
+            color: root.mSurface
+            border.color: Qt.rgba(root.mOutline.r, root.mOutline.g, root.mOutline.b, 0.2)
+            border.width: 1 * scaleFactor
+            radius: root.radiusL
+        }
+
+        ListView {
+            id: userList
+            anchors.fill: parent
+            anchors.margins: userPopup.popupPadding
+            model: userModel
+            clip: true
+            interactive: contentHeight > height
+            boundsBehavior: Flickable.StopAtBounds
+            currentIndex: {
+                for (var i = 0; i < userModel.count; i++) {
+                    if (userModel.get(i).name === root.selectedUser) return i
+                }
+                return -1
+            }
+
+            delegate: Controls.ItemDelegate {
+                id: userDelegate
+                width: parent.width
+                height: userPopup.rowHeight
+
+                // ListView.isCurrentItem is set synchronously on delegate creation,
+                // unlike a plain binding to root.selectedUser — so highlight is correct on open.
+                readonly property bool isSelected: ListView.isCurrentItem
+                highlighted: false  // disable built-in highlight to avoid conflicts with custom background
+
+                readonly property real avatarSize: userPopup.rowHeight - 12 * scaleFactor
+
+                onClicked: {
+                    userList.currentIndex = index
+                    root.selectedUser = model.name
+                    userPopup.close()
+                }
+
+                background: Rectangle {
+                    color:        parent.isSelected ? Qt.rgba(root.mPrimary.r, root.mPrimary.g, root.mPrimary.b, 0.18) : "transparent"
+                    border.color: parent.isSelected ? Qt.rgba(root.mPrimary.r, root.mPrimary.g, root.mPrimary.b, 0.5)  : "transparent"
+                    border.width: parent.isSelected ? 1 * scaleFactor : 0
+                    radius: root.radiusOuter - userPopup.popupPadding
+                }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 6 * scaleFactor
+                    spacing: 10 * scaleFactor
+
+                    Item {
+                        Layout.preferredWidth: userDelegate.avatarSize
+                        Layout.preferredHeight: userDelegate.avatarSize
+
+                        Rectangle {
+                            id: delegateMask
+                            anchors.fill: parent
+                            radius: width / 2
+                            visible: false
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: width / 2
+                            color: root.mSurfaceVariant
+                        }
+
+                        Image {
+                            id: delegateAvatar
+                            anchors.fill: parent
+                            property int tryIndex: 0
+                            property var iconPaths: {
+                                var paths = []
+                                var u = model.name
+                                if (u) {
+                                    if (config.avatarPath && config.avatarPath !== "")
+                                        paths.push("file://" + config.avatarPath)
+                                    if (model.icon && model.icon !== "") {
+                                        var p = model.icon
+                                        if (p.indexOf("://") === -1 && p.charAt(0) === "/")
+                                            p = "file://" + p
+                                        paths.push(p)
+                                    }
+                                    paths.push("file:///var/lib/AccountsService/icons/" + u)
+                                    if (model.homeDir) {
+                                        paths.push("file://" + model.homeDir + "/.face.icon")
+                                        paths.push("file://" + model.homeDir + "/.face")
+                                    }
+                                    paths.push("file:///usr/share/sddm/faces/" + u + ".face.icon")
+                                }
+                                paths.push("file:///usr/share/sddm/faces/.face.icon")
+                                return paths
+                            }
+                            source: iconPaths.length > 0 ? iconPaths[Math.min(tryIndex, iconPaths.length - 1)] : ""
+                            fillMode: Image.PreserveAspectCrop
+                            smooth: true
+                            asynchronous: true
+                            layer.enabled: true
+                            layer.effect: OpacityMask { maskSource: delegateMask }
+                            onStatusChanged: {
+                                if (status === Image.Error && tryIndex < iconPaths.length - 1)
+                                    tryIndex++
+                            }
+                        }
+
+                        Image {
+                            anchors.fill: parent
+                            anchors.margins: 6 * scaleFactor
+                            source: "Assets/logo.svg"
+                            fillMode: Image.PreserveAspectFit
+                            visible: delegateAvatar.status !== Image.Ready && delegateAvatar.status !== Image.Loading
+                            layer.enabled: true
+                            layer.effect: OpacityMask { maskSource: delegateMask }
+                        }
+                    }
+
+                    Text {
+                        text: model.realName || model.name
+                        color: root.mOnSurface
+                        font.pixelSize: root.fontSizeL
+                        Layout.fillWidth: true
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================
+    // Header card: avatar, greeting, date, clock, battery
+    // =========================================================
     Rectangle {
         id: headerCard
         anchors.top: parent.top
         anchors.topMargin: parent.height * 0.12 + 20 * scaleFactor
         anchors.horizontalCenter: parent.horizontalCenter
-        opacity: 0
-
-        Component.onCompleted: fadeInHeader.start()
-        ParallelAnimation {
-            id: fadeInHeader
-            NumberAnimation { target: headerCard; property: "opacity"; to: 1; duration: 1000; easing.type: Easing.OutCubic }
-            NumberAnimation { target: headerCard; property: "anchors.topMargin"; to: root.height * 0.12; duration: 1000; easing.type: Easing.OutCubic }
-        }
-
         width: Math.max(400 * scaleFactor, Math.min(parent.width * 0.70, 550 * scaleFactor))
         height: 120 * scaleFactor
         radius: root.radiusL
         color: root.mSurface
         border.color: Qt.rgba(root.mOutline.r, root.mOutline.g, root.mOutline.b, 0.2)
         border.width: 1 * scaleFactor
+        opacity: 0
+
+        Component.onCompleted: fadeInHeader.start()
+
+        ParallelAnimation {
+            id: fadeInHeader
+            NumberAnimation { target: headerCard; property: "opacity";              to: 1;                    duration: 1000; easing.type: Easing.OutCubic }
+            NumberAnimation { target: headerCard; property: "anchors.topMargin";    to: root.height * 0.12;   duration: 1000; easing.type: Easing.OutCubic }
+        }
 
         RowLayout {
-            id: headerRow
             anchors.fill: parent
             anchors.margins: 16 * scaleFactor
             spacing: 32 * scaleFactor
 
-            // ---- Avatar ----
+            // --- Avatar ---
             Item {
                 id: avatarContainer
                 Layout.preferredWidth: 70 * scaleFactor
                 Layout.preferredHeight: 70 * scaleFactor
                 Layout.alignment: Qt.AlignVCenter
 
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: userPopup.open()
+                }
+
                 SequentialAnimation {
                     running: true
                     loops: Animation.Infinite
-                    NumberAnimation { target: avatarContainer; property: "scale"; from: 1.0; to: 1.06; duration: 1800; easing.type: Easing.InOutSine }
-                    NumberAnimation { target: avatarContainer; property: "scale"; from: 1.06; to: 1.0; duration: 1800; easing.type: Easing.InOutSine }
+                    NumberAnimation { target: avatarContainer; property: "scale"; from: 1.0;  to: 1.06; duration: 1800; easing.type: Easing.InOutSine }
+                    NumberAnimation { target: avatarContainer; property: "scale"; from: 1.06; to: 1.0;  duration: 1800; easing.type: Easing.InOutSine }
                 }
 
                 Rectangle {
                     id: avatarBorder
                     anchors.centerIn: parent
-                    width: parent.width + 4 * scaleFactor
+                    width:  parent.width  + 4 * scaleFactor
                     height: parent.height + 4 * scaleFactor
                     radius: width / 2
                     color: "transparent"
-                    property color animColor: "#c7a1d8"
                     border.width: 2 * scaleFactor
+                    property color animColor: "#c7a1d8"
                     border.color: animColor
 
                     SequentialAnimation {
@@ -192,19 +360,30 @@ Rectangle {
                 Item {
                     id: avatarRect
                     anchors.centerIn: parent
-                    width: 70 * scaleFactor
+                    width:  70 * scaleFactor
                     height: 70 * scaleFactor
 
-                    property int tryIndex: 0
-                    property string primaryUser:     userModel.lastUser
-                    property string currentIcon:     ""
-                    property string currentHome:     ""
+                    property int    tryIndex:       0
+                    property string primaryUser:    userModel.lastUser
+                    property string currentIcon:    ""
+                    property string currentHome:    ""
                     property string currentRealName: ""
-                    property string firstUserName:   ""
-                    property string displayUser: primaryUser !== "" ? primaryUser : firstUserName
-                    property string displayName: currentRealName !== "" ? currentRealName : (displayUser !== "" ? displayUser : "User")
+                    property string firstUserName:  ""
+                    property string displayUser:    root.selectedUser !== "" ? root.selectedUser : (primaryUser !== "" ? primaryUser : firstUserName)
+                    property string displayName:    currentRealName !== "" ? currentRealName : (displayUser !== "" ? displayUser : "User")
 
-                    onDisplayUserChanged: { tryIndex = 0 }
+                    onDisplayUserChanged: tryIndex = 0
+
+                    Repeater {
+                        model: userModel
+                        delegate: Item {
+                            visible: false
+                            Binding { target: avatarRect; property: "firstUserName";    value: model.name;     when: index === 0 }
+                            Binding { target: avatarRect; property: "currentIcon";      value: model.icon;     when: model.name === avatarRect.displayUser }
+                            Binding { target: avatarRect; property: "currentHome";      value: model.homeDir;  when: model.name === avatarRect.displayUser }
+                            Binding { target: avatarRect; property: "currentRealName";  value: model.realName; when: model.name === avatarRect.displayUser }
+                        }
+                    }
 
                     property var iconPaths: {
                         var paths = []
@@ -214,7 +393,7 @@ Rectangle {
                                 paths.push("file://" + config.avatarPath)
                             if (currentIcon && currentIcon !== "") {
                                 var p = currentIcon
-                                if (p.indexOf("://") === -1 && p.charAt(0) === '/')
+                                if (p.indexOf("://") === -1 && p.charAt(0) === "/")
                                     p = "file://" + p
                                 paths.push(p)
                             }
@@ -227,17 +406,6 @@ Rectangle {
                         }
                         paths.push("file:///usr/share/sddm/faces/.face.icon")
                         return paths
-                    }
-
-                    Repeater {
-                        model: userModel
-                        delegate: Item {
-                            visible: false
-                            Binding { target: avatarRect; property: "firstUserName";   value: model.name;     when: index === 0 }
-                            Binding { target: avatarRect; property: "currentIcon";     value: model.icon;     when: model.name === avatarRect.displayUser }
-                            Binding { target: avatarRect; property: "currentHome";     value: model.homeDir;  when: model.name === avatarRect.displayUser }
-                            Binding { target: avatarRect; property: "currentRealName"; value: model.realName; when: model.name === avatarRect.displayUser }
-                        }
                     }
 
                     Rectangle {
@@ -265,7 +433,6 @@ Rectangle {
                     }
 
                     Image {
-                        id: fallbackLogo
                         anchors.fill: parent
                         anchors.margins: 8 * scaleFactor
                         source: "Assets/logo.svg"
@@ -279,10 +446,16 @@ Rectangle {
                 }
             }
 
-            // ---- Text Info ----
+            // --- Greeting & date ---
             ColumnLayout {
                 Layout.alignment: Qt.AlignVCenter
                 spacing: 2 * scaleFactor
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: userPopup.open()
+                }
 
                 Text {
                     text: "Welcome back, " + avatarRect.displayName + "!"
@@ -295,19 +468,18 @@ Rectangle {
                     text: Qt.formatDate(new Date(), "dddd, MMMM d")
                     font.pixelSize: root.fontSizeXL
                     color: root.mOnSurfaceVariant
-                }
-
-                Timer {
-                    interval: 60000
-                    running: true
-                    repeat: true
-                    onTriggered: dateText.text = Qt.formatDate(new Date(), "dddd, MMMM d")
+                    Timer {
+                        interval: 60000
+                        running: true
+                        repeat: true
+                        onTriggered: dateText.text = Qt.formatDate(new Date(), "dddd, MMMM d")
+                    }
                 }
             }
 
             Item { Layout.fillWidth: true }
 
-            // ---- Clock + Battery ----
+            // --- Clock & battery ---
             ColumnLayout {
                 Layout.alignment: Qt.AlignVCenter
                 spacing: 4 * scaleFactor
@@ -319,7 +491,6 @@ Rectangle {
                     font.bold: true
                     color: root.mOnSurface
                     Layout.alignment: Qt.AlignHCenter
-
                     Timer {
                         interval: 1000
                         running: true
@@ -328,23 +499,19 @@ Rectangle {
                     }
                 }
 
-                // ---- Battery / AC ----
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     spacing: 6 * scaleFactor
 
-                    // Иконка батареи
                     Text {
+                        font.pixelSize: root.fontSizeL
+                        font.family: nerdFont.status === FontLoader.Ready ? nerdFont.name : ""
+                        color: batteryReader.color
                         text: {
-                            // Если шрифт не загружен – показываем короткий текст
-                            if (nerdFont.status !== FontLoader.Ready) {
-                                if (batteryReader.percent < 0) return "N/A"
-                                return batteryReader.charging ? "CHG" : "BAT"
-                            }
-
-                            // Когда идёт зарядка – используем иконки battery-charging-*
+                            if (nerdFont.status !== FontLoader.Ready)
+                                return batteryReader.percent < 0 ? "N/A" : (batteryReader.charging ? "CHG" : "BAT")
                             if (batteryReader.charging) {
-                                if (batteryReader.percent >= 95) return "󰂅" 
+                                if (batteryReader.percent >= 95) return "󰂅"
                                 if (batteryReader.percent >= 90) return "󰂋"
                                 if (batteryReader.percent >= 80) return "󰂊"
                                 if (batteryReader.percent >= 70) return "󰂉"
@@ -356,8 +523,6 @@ Rectangle {
                                 if (batteryReader.percent >= 10) return "󰢜"
                                 return "󰢟"
                             }
-
-                            // Обычный разряд
                             if (batteryReader.percent >= 95) return "󰁹"
                             if (batteryReader.percent >= 90) return "󰂂"
                             if (batteryReader.percent >= 80) return "󰂁"
@@ -371,12 +536,8 @@ Rectangle {
                             if (batteryReader.percent >= 1)  return "󱃍"
                             return "󱉞"
                         }
-                        font.pixelSize: root.fontSizeL
-                        font.family: nerdFont.status === FontLoader.Ready ? nerdFont.name : ""
-                        color: batteryReader.color
                     }
 
-                    // Процент или No battery
                     Text {
                         text: batteryReader.percent >= 0 ? batteryReader.percent + "%" : "No battery"
                         font.pixelSize: root.fontSizeM
@@ -385,10 +546,8 @@ Rectangle {
 
                     QtObject {
                         id: batteryReader
-                        property int percent: -1
-                        property bool charging: false
-
-                        // Красный → Жёлтый → Белый → Зелёный
+                        property int   percent:  -1
+                        property bool  charging: false
                         property color color: {
                             if (percent < 0)   return root.mOnSurfaceVariant
                             if (percent <= 20) return root.mError
@@ -412,12 +571,10 @@ Rectangle {
                                 readXhr(Qt.resolvedUrl("debug_battery.json"), function(v) {
                                     try {
                                         var d = JSON.parse(v)
-                                        percent = (d.percent !== undefined) ? d.percent : -1
+                                        percent  = d.percent  !== undefined ? d.percent  : -1
                                         charging = d.charging || false
-                                        console.log("Battery update (debug):", percent, charging)
                                     } catch(e) {
                                         percent = -1; charging = false
-                                        console.log("Error parsing debug_battery.json:", e)
                                     }
                                 })
                             } else {
@@ -445,27 +602,20 @@ Rectangle {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Bottom Card: Password & Controls
-    // -------------------------------------------------------------------------
+    // =========================================================
+    // Bottom card: password field & system controls
+    // =========================================================
     Rectangle {
         id: bottomCard
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
-        opacity: 0
-
-        Component.onCompleted: fadeInBottom.start()
-        ParallelAnimation {
-            id: fadeInBottom
-            NumberAnimation { target: bottomCard; property: "opacity"; to: 1; duration: 1000; easing.type: Easing.OutCubic; from: 0 }
-        }
-
         width: Math.min(750 * scaleFactor, parent.width * 0.9)
         height: 140 * scaleFactor
         radius: root.radiusL
         color: root.mSurface
         border.color: Qt.rgba(root.mOutline.r, root.mOutline.g, root.mOutline.b, 0.2)
         border.width: 1 * scaleFactor
+        opacity: 0
 
         property real activeBottomMargin: passwordBox.text.length > 0 ? 88 * scaleFactor : 100 * scaleFactor
         anchors.bottomMargin: activeBottomMargin
@@ -473,12 +623,23 @@ Rectangle {
             NumberAnimation { duration: 250; easing.type: Easing.InOutQuad }
         }
 
+        Component.onCompleted: fadeInBottom.start()
+
+        NumberAnimation {
+            id: fadeInBottom
+            target: bottomCard
+            property: "opacity"
+            from: 0; to: 1
+            duration: 1000
+            easing.type: Easing.OutCubic
+        }
+
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 20 * scaleFactor
             spacing: 15 * scaleFactor
 
-            // ---- Password Field Row ----
+            // --- Password row ---
             RowLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 50 * scaleFactor
@@ -489,22 +650,23 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     color: root.mSurfaceVariant
-                    radius: 12 * scaleFactor
+                    radius: root.radiusInner
                     clip: true
                     border.width: 2 * scaleFactor
                     border.color: passwordBox.text.length > 0 ? root.mPrimary : "transparent"
                     Behavior on border.color { ColorAnimation { duration: 200 } }
 
+                    // Visual password characters
                     Row {
                         id: symbolsWrapper
                         spacing: 14
                         anchors.left: parent.left
                         anchors.leftMargin: 15 * scaleFactor
                         anchors.verticalCenter: parent.verticalCenter
+
                         Repeater {
                             model: passwordBox.text.length
                             delegate: Item {
-                                id: charItem
                                 width: 20
                                 height: 20
                                 property int shapeType: index % 8
@@ -516,93 +678,117 @@ Rectangle {
                                     height: 26
                                     property color currentColor: root.mOnSurface
                                     onCurrentColorChanged: requestPaint()
-
                                     onPaint: {
-                                        var ctx = getContext("2d");
-                                        ctx.reset();
-                                        ctx.fillStyle = shapeCanvas.currentColor;
-                                        var cx = width / 2, cy = height / 2;
-                                        var baseSize = width * 0.9;
-                                        ctx.beginPath();
-
+                                        var ctx = getContext("2d")
+                                        ctx.reset()
+                                        ctx.fillStyle = shapeCanvas.currentColor
+                                        var cx = width / 2, cy = height / 2
+                                        var sz = width * 0.9
+                                        ctx.beginPath()
                                         if (shapeType === 0) {
-                                            ctx.arc(cx, cy, baseSize / 2, 0, Math.PI * 2);
+                                            ctx.arc(cx, cy, sz / 2, 0, Math.PI * 2)
                                         } else if (shapeType === 1) {
-                                            var half = baseSize * 1.1 / 2;
-                                            ctx.moveTo(cx, cy - half); ctx.lineTo(cx + half, cy);
-                                            ctx.lineTo(cx, cy + half); ctx.lineTo(cx - half, cy);
-                                            ctx.closePath();
+                                            var h = sz * 1.1 / 2
+                                            ctx.moveTo(cx, cy - h); ctx.lineTo(cx + h, cy)
+                                            ctx.lineTo(cx, cy + h); ctx.lineTo(cx - h, cy)
+                                            ctx.closePath()
                                         } else if (shapeType === 2) {
-                                            var tSize = baseSize * 1.15;
-                                            var tH = (Math.sqrt(3)/2) * tSize;
-                                            var yOff = tH / 6;
-                                            ctx.moveTo(cx, cy - tH/2 - yOff);
-                                            ctx.lineTo(cx + tSize/2, cy + tH/2 - yOff);
-                                            ctx.lineTo(cx - tSize/2, cy + tH/2 - yOff);
-                                            ctx.closePath();
+                                            var tS = sz * 1.15, tH = (Math.sqrt(3) / 2) * tS, tO = tH / 6
+                                            ctx.moveTo(cx, cy - tH / 2 - tO)
+                                            ctx.lineTo(cx + tS / 2, cy + tH / 2 - tO)
+                                            ctx.lineTo(cx - tS / 2, cy + tH / 2 - tO)
+                                            ctx.closePath()
                                         } else if (shapeType === 3) {
-                                            var sqS = baseSize * 0.85, off = sqS/2, r = sqS * 0.4;
-                                            ctx.moveTo(cx-off+r, cy-off); ctx.lineTo(cx+off-r, cy-off);
-                                            ctx.quadraticCurveTo(cx+off,cy-off, cx+off,cy-off+r);
-                                            ctx.lineTo(cx+off,cy+off-r);
-                                            ctx.quadraticCurveTo(cx+off,cy+off, cx+off-r,cy+off);
-                                            ctx.lineTo(cx-off+r,cy+off);
-                                            ctx.quadraticCurveTo(cx-off,cy+off, cx-off,cy+off-r);
-                                            ctx.lineTo(cx-off,cy-off+r);
-                                            ctx.quadraticCurveTo(cx-off,cy-off, cx-off+r,cy-off);
-                                            ctx.closePath();
+                                            var sqS = sz * 0.85, off = sqS / 2, r = sqS * 0.4
+                                            ctx.moveTo(cx-off+r, cy-off); ctx.lineTo(cx+off-r, cy-off)
+                                            ctx.quadraticCurveTo(cx+off, cy-off, cx+off, cy-off+r)
+                                            ctx.lineTo(cx+off, cy+off-r)
+                                            ctx.quadraticCurveTo(cx+off, cy+off, cx+off-r, cy+off)
+                                            ctx.lineTo(cx-off+r, cy+off)
+                                            ctx.quadraticCurveTo(cx-off, cy+off, cx-off, cy+off-r)
+                                            ctx.lineTo(cx-off, cy-off+r)
+                                            ctx.quadraticCurveTo(cx-off, cy-off, cx-off+r, cy-off)
+                                            ctx.closePath()
                                         } else if (shapeType === 4) {
-                                            var oR = baseSize*0.75, iR = baseSize*0.32, spikes = 5;
-                                            var step = Math.PI/spikes, rot = Math.PI/2*3;
-                                            ctx.moveTo(cx, cy - oR);
+                                            var oR = sz*0.75, iR = sz*0.32, spikes = 5
+                                            var step = Math.PI / spikes, rot = Math.PI / 2 * 3
+                                            ctx.moveTo(cx, cy - oR)
                                             for (var i = 0; i < spikes; i++) {
-                                                ctx.lineTo(cx+Math.cos(rot)*oR, cy+Math.sin(rot)*oR); rot+=step;
-                                                ctx.lineTo(cx+Math.cos(rot)*iR, cy+Math.sin(rot)*iR); rot+=step;
+                                                ctx.lineTo(cx + Math.cos(rot)*oR, cy + Math.sin(rot)*oR); rot += step
+                                                ctx.lineTo(cx + Math.cos(rot)*iR, cy + Math.sin(rot)*iR); rot += step
                                             }
-                                            ctx.lineTo(cx, cy - oR); ctx.closePath();
+                                            ctx.lineTo(cx, cy - oR); ctx.closePath()
                                         } else if (shapeType === 5) {
-                                            var pR = baseSize*0.55, pA = (Math.PI*2)/5, sA = -Math.PI/2;
-                                            ctx.moveTo(cx+pR*Math.cos(sA), cy+pR*Math.sin(sA));
-                                            for (var i=1; i<=5; i++) ctx.lineTo(cx+pR*Math.cos(sA+i*pA), cy+pR*Math.sin(sA+i*pA));
-                                            ctx.closePath();
+                                            var pR = sz*0.55, pA = (Math.PI*2)/5, sA = -Math.PI/2
+                                            ctx.moveTo(cx + pR*Math.cos(sA), cy + pR*Math.sin(sA))
+                                            for (var i = 1; i <= 5; i++)
+                                                ctx.lineTo(cx + pR*Math.cos(sA + i*pA), cy + pR*Math.sin(sA + i*pA))
+                                            ctx.closePath()
                                         } else if (shapeType === 6) {
-                                            var hR = baseSize*0.5, hA = (Math.PI*2)/6, hS = -Math.PI/2;
-                                            ctx.moveTo(cx+hR*Math.cos(hS), cy+hR*Math.sin(hS));
-                                            for (var i=1; i<=6; i++) ctx.lineTo(cx+hR*Math.cos(hS+i*hA), cy+hR*Math.sin(hS+i*hA));
-                                            ctx.closePath();
+                                            var hR = sz*0.5, hA = (Math.PI*2)/6, hS = -Math.PI/2
+                                            ctx.moveTo(cx + hR*Math.cos(hS), cy + hR*Math.sin(hS))
+                                            for (var i = 1; i <= 6; i++)
+                                                ctx.lineTo(cx + hR*Math.cos(hS + i*hA), cy + hR*Math.sin(hS + i*hA))
+                                            ctx.closePath()
                                         } else {
-                                            var fR = baseSize*0.5, petals = 8, fStep = (Math.PI*2)/petals;
-                                            for (var i=0; i<petals; i++) {
-                                                var t1=i*fStep, t2=(i+1)*fStep, cpT=(t1+t2)/2, cpR=fR*1.25;
-                                                var sx=cx+fR*Math.cos(t1), sy=cy+fR*Math.sin(t1);
-                                                var ex=cx+fR*Math.cos(t2), ey=cy+fR*Math.sin(t2);
-                                                var cpx=cx+cpR*Math.cos(cpT), cpy=cy+cpR*Math.sin(cpT);
-                                                if (i===0) ctx.moveTo(sx,sy);
-                                                ctx.quadraticCurveTo(cpx,cpy,ex,ey);
+                                            var fR = sz*0.5, petals = 8, fStep = (Math.PI*2) / petals
+                                            for (var i = 0; i < petals; i++) {
+                                                var t1 = i*fStep, t2 = (i+1)*fStep, cpT = (t1+t2)/2, cpR = fR*1.25
+                                                var sx = cx + fR*Math.cos(t1), sy = cy + fR*Math.sin(t1)
+                                                var ex = cx + fR*Math.cos(t2), ey = cy + fR*Math.sin(t2)
+                                                var cpx = cx + cpR*Math.cos(cpT), cpy = cy + cpR*Math.sin(cpT)
+                                                if (i === 0) ctx.moveTo(sx, sy)
+                                                ctx.quadraticCurveTo(cpx, cpy, ex, ey)
                                             }
-                                            ctx.closePath();
+                                            ctx.closePath()
                                         }
-                                        ctx.fill();
+                                        ctx.fill()
                                     }
                                 }
                             }
                         }
                     }
 
+                    // Keyboard layout & Caps Lock indicators
+                    Column {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 12 * scaleFactor
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2 * scaleFactor
+
+                        Text {
+                            text: root.keyboardLayout
+                            font.pixelSize: root.fontSizeM
+                            color: root.mOnSurfaceVariant
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                        Text {
+                            visible: root.capsLockOn
+                            text: "⇪ Caps"
+                            font.pixelSize: root.fontSizeM
+                            color: root.mError
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                    }
+
+                    // Hidden input — captures keystrokes, NoEcho for security
                     TextInput {
                         id: passwordBox
                         anchors.fill: parent
                         anchors.margins: 15 * scaleFactor
                         verticalAlignment: Text.AlignVCenter
-                        text: ""
                         echoMode: TextInput.NoEcho
                         visible: false
                         font.pixelSize: 14 * scaleFactor
                         focus: true
-                        onAccepted: sddm.login(userModel.lastUser, passwordBox.text, sessionList.currentIndex)
+                        KeyNavigation.tab: loginButton
                         Keys.onPressed: {
-                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                sddm.login(userModel.lastUser, passwordBox.text, sessionList.currentIndex)
+                            if (event.key === Qt.Key_CapsLock) {
+                                root.capsLockOn = !root.capsLockOn
+                                event.accepted = true
+                            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                sddm.login(root.selectedUser !== "" ? root.selectedUser : userModel.lastUser,
+                                           passwordBox.text, sessionList.currentIndex)
                                 event.accepted = true
                             }
                         }
@@ -620,11 +806,15 @@ Rectangle {
                 }
 
                 Controls.Button {
+                    id: loginButton
                     Layout.preferredWidth: 100 * scaleFactor
                     Layout.fillHeight: true
+                    KeyNavigation.tab: sessionList
+                    onClicked: sddm.login(root.selectedUser !== "" ? root.selectedUser : userModel.lastUser,
+                                          passwordBox.text, sessionList.currentIndex)
                     background: Rectangle {
                         color: parent.down ? Qt.darker(root.mPrimary, 1.2) : root.mPrimary
-                        radius: 12 * scaleFactor
+                        radius: root.radiusInner
                     }
                     contentItem: Text {
                         text: "Login"
@@ -634,11 +824,10 @@ Rectangle {
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
-                    onClicked: sddm.login(userModel.lastUser, passwordBox.text, sessionList.currentIndex)
                 }
             }
 
-            // ---- Controls Row ----
+            // --- Session & power controls ---
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 10 * scaleFactor
@@ -650,6 +839,7 @@ Rectangle {
                     currentIndex: sessionModel.lastIndex
                     Layout.preferredWidth: 200 * scaleFactor
                     Layout.preferredHeight: 36 * scaleFactor
+                    KeyNavigation.tab: suspendButton
 
                     delegate: Controls.ItemDelegate {
                         width: parent.width
@@ -667,7 +857,7 @@ Rectangle {
                     }
                     background: Rectangle {
                         color: root.mSurfaceVariant
-                        radius: 8 * scaleFactor
+                        radius: root.radiusInner
                     }
                     contentItem: Text {
                         leftPadding: 10 * scaleFactor
@@ -689,51 +879,43 @@ Rectangle {
                             Controls.ScrollIndicator.vertical: Controls.ScrollIndicator { }
                         }
                         background: Rectangle {
-                            border.color: root.mOutline
                             color: root.mSurface
-                            radius: 4 * scaleFactor
+                            border.color: root.mOutline
+                            radius: root.radiusInner
                         }
                     }
                 }
 
                 Item { Layout.fillWidth: true }
 
-                Repeater {
-                    model: [
-                        { text: "Suspend",  type: "suspend"  },
-                        { text: "Reboot",   type: "reboot"   },
-                        { text: "Shutdown", type: "shutdown" }
-                    ]
-                    delegate: Controls.Button {
-                        text: modelData.text
-                        Layout.preferredHeight: 36 * scaleFactor
-                        Layout.preferredWidth: 100 * scaleFactor
-                        background: Rectangle {
-                            color: parent.down ? Qt.darker(root.mSurfaceVariant, 1.2) : root.mSurfaceVariant
-                            radius: 8 * scaleFactor
-                        }
-                        contentItem: Text {
-                            text: parent.text
-                            font.pixelSize: root.fontSizeM
-                            color: root.mOnSurface
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                        onClicked: {
-                            if      (modelData.type === "suspend")  sddm.suspend()
-                            else if (modelData.type === "reboot")   sddm.reboot()
-                            else if (modelData.type === "shutdown")  sddm.powerOff()
-                        }
+                component PowerButton: Controls.Button {
+                    Layout.preferredHeight: 36 * scaleFactor
+                    Layout.preferredWidth: 100 * scaleFactor
+                    background: Rectangle {
+                        color: parent.down ? Qt.darker(root.mSurfaceVariant, 1.2) : root.mSurfaceVariant
+                        radius: root.radiusInner
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        font.pixelSize: root.fontSizeM
+                        color: root.mOnSurface
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
+
+                PowerButton { id: suspendButton;  text: "Suspend";  KeyNavigation.tab: rebootButton;   onClicked: sddm.suspend()  }
+                PowerButton { id: rebootButton;   text: "Reboot";   KeyNavigation.tab: shutdownButton;  onClicked: sddm.reboot()   }
+                PowerButton { id: shutdownButton; text: "Shutdown"; KeyNavigation.tab: passwordBox;     onClicked: sddm.powerOff() }
             }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Error Message
-    // -------------------------------------------------------------------------
+    // =========================================================
+    // Error toast
+    // =========================================================
     Rectangle {
+        id: errorRect
         width: errorMessage.implicitWidth + 40 * scaleFactor
         height: 50 * scaleFactor
         anchors.horizontalCenter: parent.horizontalCenter
@@ -741,7 +923,17 @@ Rectangle {
         anchors.bottomMargin: 20 * scaleFactor
         radius: root.radiusL
         color: root.mError
-        visible: errorMessage.text !== ""
+        visible: false
+        opacity: 0
+
+        states: [
+            State { name: "visible"; when: errorMessage.text !== ""; PropertyChanges { target: errorRect; opacity: 1; visible: true  } },
+            State { name: "hidden";  when: errorMessage.text === ""; PropertyChanges { target: errorRect; opacity: 0; visible: false } }
+        ]
+        transitions: [
+            Transition { from: "hidden";  to: "visible"; NumberAnimation { properties: "opacity"; duration: 300 } },
+            Transition { from: "visible"; to: "hidden";  NumberAnimation { properties: "opacity"; duration: 300 } }
+        ]
 
         Text {
             id: errorMessage
@@ -753,9 +945,18 @@ Rectangle {
         }
     }
 
-    // Shake animation for wrong password
+    Timer {
+        id: errorTimer
+        interval: 4000
+        onTriggered: errorMessage.text = ""
+    }
+
+    // =========================================================
+    // Shake animation on failed login
+    // =========================================================
     SequentialAnimation {
         id: shakeAnimation
+        property string tgt: "anchors.horizontalCenterOffset"
         PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to: -18; duration: 50 }
         PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to:  18; duration: 50 }
         PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to: -12; duration: 50 }
@@ -763,14 +964,5 @@ Rectangle {
         PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to:  -6; duration: 50 }
         PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to:   6; duration: 50 }
         PropertyAnimation { target: bottomCard; property: "anchors.horizontalCenterOffset"; to:   0; duration: 50 }
-    }
-
-    Connections {
-        target: sddm
-        function onLoginFailed() {
-            passwordBox.text = ""
-            errorMessage.text = "Authentication failed"
-            shakeAnimation.start()
-        }
     }
 }
