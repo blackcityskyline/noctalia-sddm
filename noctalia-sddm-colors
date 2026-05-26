@@ -19,12 +19,12 @@ print(d.get('general', {}).get('avatarImage', ''))
 ")
 
 if [ -n "$AVATAR" ] && [ -f "$AVATAR" ]; then
-    if grep -q "^avatarPath=" ~/.cache/noctalia/sddm-theme.conf; then
-        sed -i "s|^avatarPath=.*|avatarPath=$AVATAR|" ~/.cache/noctalia/sddm-theme.conf
-    else
-        echo "avatarPath=$AVATAR" >> ~/.cache/noctalia/sddm-theme.conf
-    fi
+  if grep -q "^avatarPath=" ~/.cache/noctalia/sddm-theme.conf; then
+    sed -i "s|^avatarPath=.*|avatarPath=$AVATAR|" ~/.cache/noctalia/sddm-theme.conf
+  else
+    echo "avatarPath=$AVATAR" >>~/.cache/noctalia/sddm-theme.conf
+  fi
 fi
 
-tee "$THEME_DIR/theme.conf" < ~/.cache/noctalia/sddm-theme.conf > /dev/null
+tee "$THEME_DIR/theme.conf" <~/.cache/noctalia/sddm-theme.conf >/dev/null
 [ -f "$WALLPAPER" ] && cp "$WALLPAPER" "$THEME_DIR/Assets/background.png"
